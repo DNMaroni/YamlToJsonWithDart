@@ -5,7 +5,7 @@ import 'dart:io';
 */
 cleanLine(String linha) {
   //remove comentários da llinha
-  linha = linha.replaceAll(RegExp('#(.*)?\$'), '');
+  linha = linha.replaceAll(RegExp('#(.*)?\$'), '').trimRight();
 
   return linha;
 }
@@ -22,8 +22,10 @@ splitValue(String linha, List<String> linhas, int index) {
   }
 
   String char = '{';
-  if ((index + 1) == linhas.length || countSpaces(linhas[index + 1]) == 0) {
-    char = 'null';
+  if ((index + 1) == linhas.length ||
+      countSpaces(linhas[index + 1]) == 0 ||
+      countSpaces(linhas[index + 1]) == countSpaces(linhas[index])) {
+    char = 'null,';
   } else if ((index + 1) < linhas.length && linhas[index + 1].contains('- ')) {
     char = '[';
   }
@@ -53,10 +55,11 @@ void main() async {
   List<String> linhasArquivo = [];
   for (String line in linhasArq) {
     if (line.isNotEmpty && line.length > 2) {
-      linhasArquivo.add(line);
+      linhasArquivo.add(cleanLine(line));
     }
   }
 
+  print(linhasArquivo);
   List<String> novasLinhas = [];
 
   bool flagbloco = false;
@@ -64,15 +67,13 @@ void main() async {
   bool flagfinalcode = false;
 
   for (int index = 0; index < linhasArquivo.length; index++) {
-    //ignora enters
-
     if (linhasArquivo[index].isEmpty) continue;
 
-    String linha = cleanLine(linhasArquivo[index]);
+    String linha = linhasArquivo[index];
 
     String novalinha = splitValue(linha, linhasArquivo, index);
 
-    if (novalinha.contains('{')) {
+    if (countSpaces(linha) > 0) {
       flagbloco = true;
     }
 
@@ -105,19 +106,9 @@ void main() async {
       break;
     }
 
-    if (flagbloco &&
-        (countSpaces(linhasArquivo[index + 1]) ==
-            countSpaces(linhasArquivo[index]) - 1) &&
-        linhasArquivo[index + 1].length > 2) {
-      novasLinhas[novasLinhas.length - 1] =
-          novasLinhas[novasLinhas.length - 1].replaceAll(',', '');
-
-      novasLinhas.add(
-          '${'\t' * (countSpaces(linhasArquivo[index + 1]) + 1)}${flagbarra ? ']' : '}'},\n');
-      flagbloco = false;
-      flagbarra = false;
-    }
-
+    /* if (linhasArquivo[index] == '  http: ^0.13.4') {
+      print(flagbloco);
+    } */
     if (flagbloco &&
         (countSpaces(linhasArquivo[index + 1]) == 0 &&
             linhasArquivo[index + 1].length > 2)) {
@@ -135,6 +126,19 @@ void main() async {
           novasLinhas.add('${'\t' * i}}\n');
         }
       }
+    }
+
+    if (flagbloco &&
+        (countSpaces(linhasArquivo[index + 1]) ==
+            countSpaces(linhasArquivo[index]) - 1) &&
+        linhasArquivo[index + 1].length > 2) {
+      novasLinhas[novasLinhas.length - 1] =
+          novasLinhas[novasLinhas.length - 1].replaceAll(',', '');
+
+      novasLinhas.add(
+          '${'\t' * (countSpaces(linhasArquivo[index + 1]) + 1)}${flagbarra ? ']' : '}'},\n');
+      flagbloco = false;
+      flagbarra = false;
     }
   }
 
