@@ -11,9 +11,16 @@ cleanLine(String linha) {
 }
 
 splitValue(String linha, List<String> linhas, int index) {
+  if (!linha.contains(':'))
+    return '"' + linha.replaceAll('- ', '').replaceAll(' ', '') + '",';
+
   List<String> arrayLinha = linha.replaceAll(' ', '').split(':');
 
-  print([index, linhas.length, arrayLinha[0]]);
+  if (arrayLinha.length > 2) {
+    arrayLinha[0] = linha.split(':')[0].replaceAll(' ', '');
+    arrayLinha[1] = linha.split(RegExp('^([^:]*):'))[1].replaceAll(' ', '');
+  }
+
   String char = '{';
   if ((index + 1) == linhas.length || countSpaces(linhas[index + 1]) == 0) {
     char = 'null';
@@ -39,13 +46,22 @@ countSpaces(String line) {
 }
 
 void main() async {
-  List<String> linhasArquivo =
+  List<String> linhasArq =
       await File('${Directory.current.path}/pubspec_masterclass.yaml')
           .readAsLines();
+
+  List<String> linhasArquivo = [];
+  for (String line in linhasArq) {
+    if (line.isNotEmpty && line.length > 2) {
+      linhasArquivo.add(line);
+    }
+  }
 
   List<String> novasLinhas = [];
 
   bool flagbloco = false;
+  bool flagbarra = false;
+  bool flagfinalcode = false;
 
   for (int index = 0; index < linhasArquivo.length; index++) {
     //ignora enters
@@ -60,13 +76,51 @@ void main() async {
       flagbloco = true;
     }
 
+    if (novalinha.contains('[') && novalinha.contains(':')) {
+      flagbarra = true;
+      flagbloco = true;
+    }
+
     int quantidadeTabs = countSpaces(linha);
     String tabs = '\t' * (quantidadeTabs + 1);
     novasLinhas.add('$tabs$novalinha\n');
 
-    if ((index + 1) == linhasArquivo.length) break;
+    if ((index + 1) == linhasArquivo.length && !flagbarra && !flagbloco)
+      break;
+    else if ((index + 1) == linhasArquivo.length && (flagbarra || flagbloco)) {
+      novasLinhas[novasLinhas.length - 1] =
+          novasLinhas[novasLinhas.length - 1].replaceAll(',', '');
 
-    if (flagbloco && countSpaces(linhasArquivo[index + 1]) == 0) {
+      for (var i = quantidadeTabs; i > 0; i--) {
+        if (i == 1) {
+          novasLinhas.add('${'\t' * i}}\n');
+          flagbloco = false;
+        } else if (i == quantidadeTabs) {
+          novasLinhas.add('${'\t' * i}${flagbarra ? ']' : '}'}\n');
+          flagbarra = false;
+        } else {
+          novasLinhas.add('${'\t' * i}}\n');
+        }
+      }
+      break;
+    }
+
+    if (flagbloco &&
+        (countSpaces(linhasArquivo[index + 1]) ==
+            countSpaces(linhasArquivo[index]) - 1) &&
+        linhasArquivo[index + 1].length > 2) {
+      novasLinhas[novasLinhas.length - 1] =
+          novasLinhas[novasLinhas.length - 1].replaceAll(',', '');
+
+      novasLinhas.add(
+          '${'\t' * (countSpaces(linhasArquivo[index + 1]) + 1)}${flagbarra ? ']' : '}'},\n');
+      flagbloco = false;
+      flagbarra = false;
+    }
+
+    if (flagbloco &&
+        (countSpaces(linhasArquivo[index + 1]) == 0 &&
+            linhasArquivo[index + 1].length > 2)) {
       novasLinhas[novasLinhas.length - 1] =
           novasLinhas[novasLinhas.length - 1].replaceAll(',', '');
 
@@ -74,6 +128,9 @@ void main() async {
         if (i == 1) {
           novasLinhas.add('${'\t' * i}},\n');
           flagbloco = false;
+        } else if (i == quantidadeTabs) {
+          novasLinhas.add('${'\t' * i}${flagbarra ? ']' : '}'}\n');
+          flagbarra = false;
         } else {
           novasLinhas.add('${'\t' * i}}\n');
         }
@@ -82,5 +139,6 @@ void main() async {
   }
 
   const filename = 'saida.json';
-  await File(filename).writeAsString('{\n${novasLinhas.join()}}');
+  var json = novasLinhas.join();
+  await File(filename).writeAsString('{\n${json}}');
 }
